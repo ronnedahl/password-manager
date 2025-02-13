@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+  <meta charset="UTF-8" />
+  <title>Password Manager</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    form {
+      margin-bottom: 20px;
+      background: #f5f5f5;
+      padding: 20px;
+      border-radius: 8px;
+    }
+    input {
+      display: block;
+      margin-bottom: 10px;
+      padding: 8px;
+      width: 100%;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    button {
+      padding: 8px 16px;
+      cursor: pointer;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin-top: 20px;
+    }
+    th, td {
+      border: 1px solid #ddd;
+      padding: 12px;
+      text-align: left;
+    }
+    th {
+      background: #f8f8f8;
+    }
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .copy-btn {
+      background: #2196F3;
+    }
+    .copy-btn:hover {
+      background: #1976D2;
+    }
+    .delete-btn {
+      background: #f44336;
+    }
+    .delete-btn:hover {
+      background: #d32f2f;
+    }
+    .toggle-password {
+      background: #9E9E9E;
+    }
+    .toggle-password:hover {
+      background: #757575;
+    }
+  </style>
+</head>
+<body>
+  <h1>Password Manager</h1>
+  <form id="passwordForm">
+    <label>
+      Användarnamn:
+      <input type="text" id="username" required />
+    </label>
+    <label>
+      Webbsida/Tjänst:
+      <input type="text" id="site" required />
+    </label>
+    <label>
+      Lösenord:
+      <input type="password" id="password" required />
+    </label>
+    <button type="submit">Spara</button>
+  </form>
+  <h2>Sparade lösenord</h2>
+  <table id="passwordTable">
+    <thead>
+      <tr>
+        <th>Användarnamn</th>
+        <th>Webbsida/Tjänst</th>
+        <th>Lösenord</th>
+        <th>Åtgärder</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Dynamiskt innehåll här -->
+    </tbody>
+  </table>
+  <script>
+    const form = document.getElementById('passwordForm');
+    const usernameInput = document.getElementById('username');
+    const siteInput = document.getElementById('site');
+    const passwordInput = document.getElementById('password');
+    const tableBody = document.querySelector('#passwordTable tbody');
+
+    // Hämta sparade lösenord vid sidladdning
+    window.addEventListener('DOMContentLoaded', loadPasswords);
+
+    function loadPasswords() {
+      fetch('http://localhost:3000/api/passwords')
+        .then(res => res.json())
+        .then(data => {
+          renderTable(data);
+        })
+        .catch(err => {
+          console.error('Fel vid hämtning av lösenord:', err);
+        });
+    }
+
+    // Hantera formulärets submit
+    form.addEventListener('submit', e => {
+      e.preventDefault();
+      const username = usernameInput.value;
+      const site = siteInput.value;
+      const password = passwordInput.value;
+
+      fetch('http://localhost:3000/api/passwords', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, site, password })
+      })
+        .then(res => res.json())
+        .then(msg => {
+          console.log('Lösenord sparat:', msg);
+          // Rensa formuläret
+          form.reset();
+          // Hämta ny lista
+          loadPasswords();
+        })
+        .catch(err => {
+          console.error('Fel vid sparning av lösenord:', err);
+        });
+    });
+
+    // Funktion för att kopiera text till urklipp
+    async function copyToClipboard(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        alert('Kopierat till urklipp!');
+      } catch (err) {
+        console.error('Kunde inte kopiera text:', err);
+      }
+    }
+
+   // Funktion för att ta bort lösenord
+function deletePassword(index) {
+  fetch(`http://localhost:3000/api/passwords/${index}`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  })
+    .then(res => {
+      if (!res.ok) {
+        throw new Error('Något gick fel vid borttagning');
+      }
+      return res.json();
+    })
+    .then(msg => {
+      console.log('Lösenord borttaget:', msg);
+      loadPasswords(); // Uppdatera listan
+    })
+    .catch(err => {
+      console.error('Fel vid borttagning av lösenord:', err);
+      alert('Kunde inte ta bort lösenordet. Försök igen.');
+    });
+}
+
+    // Funktion för att rendera tabellen
+    function renderTable(data) {
+      tableBody.innerHTML = '';
+      data.forEach((item, index) => {
+        const row = document.createElement('tr');
+        
+        // Användarnamn cell
+        const userCell = document.createElement('td');
+        userCell.textContent = item.username;
+        
+        // Webbsida cell
+        const siteCell = document.createElement('td');
+        siteCell.textContent = item.site;
+        
+        // Lösenord cell
+        const passCell = document.createElement('td');
+        const passwordSpan = document.createElement('span');
+        passwordSpan.textContent = '••••••••';
+        passwordSpan.dataset.password = item.password;
+        passCell.appendChild(passwordSpan);
+        
+        // Åtgärder cell
+        const actionCell = document.createElement('td');
+        actionCell.className = 'action-buttons';
+        
+        // Visa/Dölj lösenord knapp
+        const toggleBtn = document.createElement('button');
+        toggleBtn.textContent = 'Visa';
+        toggleBtn.className = 'toggle-password';
+        toggleBtn.onclick = () => {
+          if (passwordSpan.textContent === '••••••••') {
+            passwordSpan.textContent = item.password;
+            toggleBtn.textContent = 'Dölj';
+          } else {
+            passwordSpan.textContent = '••••••••';
+            toggleBtn.textContent = 'Visa';
+          }
+        };
+        
+        // Kopiera knapp
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = 'Kopiera';
+        copyBtn.className = 'copy-btn';
+        copyBtn.onclick = () => copyToClipboard(item.password);
+        
+        // Ta bort knapp
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = 'Ta bort';
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.onclick = () => {
+          if (confirm('Är du säker på att du vill ta bort detta lösenord?')) {
+            deletePassword(index);
+          }
+        };
+        
+        actionCell.appendChild(toggleBtn);
+        actionCell.appendChild(copyBtn);
+        actionCell.appendChild(deleteBtn);
+        
+        row.appendChild(userCell);
+        row.appendChild(siteCell);
+        row.appendChild(passCell);
+        row.appendChild(actionCell);
+        
+        tableBody.appendChild(row);
+      });
+    }
+  </script>
+</body>
+</html>
